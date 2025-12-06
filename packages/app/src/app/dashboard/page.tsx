@@ -32,6 +32,7 @@ export default function Dashboard() {
     const [location, setLocation] = useState('Bangalore');
     const [cropType, setCropType] = useState('Wheat');
     const [insuredAmount, setInsuredAmount] = useState('1000');
+    const [premiumFLR, setPremiumFLR] = useState('10.0000'); // 1 FLR per $100 insured
 
     // Chain data
     const [latestPolicyId, setLatestPolicyId] = useState<number | null>(null);
@@ -115,13 +116,18 @@ export default function Dashboard() {
             alert("Please connect wallet first");
             return;
         }
+        const premiumNum = Number(premiumFLR);
+        if (!premiumNum || premiumNum <= 0) {
+            alert("Premium must be greater than zero");
+            return;
+        }
         setLoading(true);
         try {
             const provider = new ethers.BrowserProvider((window as any).ethereum);
             const signer = await provider.getSigner();
             const contract = new ethers.Contract(CONFIG.policyManager, POLICY_MANAGER_ABI, signer);
 
-            const premium = ethers.parseEther("10");
+            const premium = ethers.parseEther(premiumNum.toFixed(6));
 
             const tx = await contract.createPolicy(
                 location,
@@ -223,7 +229,13 @@ export default function Dashboard() {
                                     <input
                                         type="number"
                                         value={insuredAmount}
-                                        onChange={(e) => setInsuredAmount(e.target.value)}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            setInsuredAmount(value);
+                                            const num = Number(value || '0');
+                                            const prem = Math.max(0, num * 0.01); // simple rule: 1 FLR per $100 insured
+                                            setPremiumFLR(prem.toFixed(4));
+                                        }}
                                         className="w-full bg-white/5 border border-white/10 rounded-xl pl-8 pr-4 py-3 focus:outline-none focus:border-[#00ff9d]/50 transition-colors"
                                     />
                                 </div>
@@ -233,7 +245,7 @@ export default function Dashboard() {
                         <div className="mt-8 pt-8 border-t border-white/10 flex items-center justify-between">
                             <div>
                                 <p className="text-sm text-gray-400">Estimated Premium</p>
-                                <p className="text-2xl font-bold text-[#00ff9d]">10 FLR</p>
+                                <p className="text-2xl font-bold text-[#00ff9d]">{premiumFLR} FLR</p>
                             </div>
                             <button
                                 onClick={purchasePolicy}

@@ -49,7 +49,7 @@ async function fetchWeatherData(location) {
     };
 }
 
-async function main() {
+async function runOracle() {
     console.log("🌦️ Starting Weather Oracle (OpenWeather + on-chain submit)...");
 
     if (!POLICY_MANAGER_ADDRESS) throw new Error("POLICY_MANAGER_ADDRESS is required");
@@ -105,7 +105,11 @@ async function main() {
     }
 }
 
-main().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-});
+module.exports = { runOracle };
+
+if (require.main === module) {
+    runOracle().catch((error) => {
+        console.error(error);
+        process.exitCode = 1;
+    });
+}

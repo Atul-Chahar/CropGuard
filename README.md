@@ -47,6 +47,14 @@ npx hardhat run scripts/oracle/weather-oracle.js --network coston2
 ```
 What it does: for each active policy, fetches OpenWeather data, requests an attestation on FdcHub, stores the result in WeatherOracleAdapter, and if adverse weather is detected, calls `checkAndPayout` on PayoutModule.
 
+### Run the oracle in a loop (automation)
+```bash
+cd packages/contract
+# every 5 minutes by default; override with ORACLE_INTERVAL_MS in milliseconds
+npx hardhat run scripts/oracle/run-loop.js --network coston2
+```
+This keeps running the oracle cycle continuously so users don’t need to run it manually.
+
 ## Notes
 - WeatherOracleAdapter is a temporary store for weather status; when FDC proof verification is integrated, replace the direct write with proof-based verification.
 - Payout math uses insured amount as USD cents and FTSO price via `getCurrentPriceWithDecimals`.
