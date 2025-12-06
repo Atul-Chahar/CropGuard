@@ -1,0 +1,11 @@
+/extract_pdf.py
+/pdf_content.txt
+/Winning hackathon project idea.pdf
+node_modules
+.env
+.DS_Store
+coverage
+cache
+artifacts
+typechain
+typechain-types
