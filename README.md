@@ -1,107 +1,106 @@
-# CropGuard – Parametric Crop‑Insurance on Flare
+# CropGuard – Decentralized Parametric Insurance
 
-## Introduction
+**CropGuard** is a next-generation parametric insurance platform built on the **Flare Network**. It protects farmers against adverse weather events (droughts, floods) using automated smart contracts, real-time FTSO price feeds, and verifiable off-chain weather data.
 
-**CropGuard** is a decentralized parametric insurance platform that protects smallholder farmers against adverse weather events. Built on the **Flare blockchain**, CropGuard leverages Flare’s enshrined data protocols and interoperability to create an automated, trustless crop‑insurance scheme. Farmers purchase micro‑insurance policies using stablecoins or FAsset tokens (wrapped BTC/XRP/DOGE) and receive automatic payouts when droughts, floods, or heat waves occur.
+![CropGuard UI](https://i.imgur.com/placeholder-image.png)
 
-## How CropGuard Works
+## 🚀 Key Features
 
-1.  **Policy Creation**: A farmer chooses their location, crop type, coverage period, and insured amount. The front‑end calculates a premium based on historical risk data and current commodity prices from the **Flare Time Series Oracle (FTSO)**.
-2.  **Premium Payment & Collateral**: The farmer pays the premium in FLR, a stablecoin, or an FAsset (e.g., FBTC). Collateral providers stake matching FAssets, supplying liquidity and earning a share of the premiums.
-3.  **Monitoring Phase**: During the policy period, a monitoring script queries off‑chain weather data via the **Flare Data Connector (FDC)**. The FDC allows smart contracts to verify events from external APIs and other blockchains.
-4.  **Payout Trigger**: If weather data (rainfall, temperature, drought index) crosses predefined thresholds, the smart contract triggers an automated payout. The payout amount is pegged to current commodity prices using the FTSO price feeds.
-5.  **Automatic Payouts**: The contract sends the insured amount to the farmer’s **Flare Smart Account**. Smart accounts enable account abstraction, sponsored gas fees, and social recovery, giving farmers a seamless user experience.
-6.  **Settlement**: If no adverse event occurs by the policy end date, the premium is distributed as yield to collateral providers.
+-   **Parametric Protection**: Payouts are triggered automatically based on data (e.g., "Rain < 100mm"), not claims adjusters.
+-   **Real-Time Pricing**: Integrates **Flare Time Series Oracle (FTSO)** on Coston2 to fetch live `C2FLR` prices for accurate premium calculations.
+-   **Verifiable Data**: Uses a custom **Weather Oracle** (simulating Flare Data Connector) to bring OpenWeatherMap data on-chain trustlessly.
+-   **Instant Payouts**: policyholders are paid immediately when conditions are met.
+-   **Modern Web3 UI**: A futuristic, glassmorphism-based dashboard built with **Next.js 15**, **Tailwind v4**, and **Framer Motion**.
 
-## Why Flare?
+## 🛠 Tech Stack
 
-Flare is a data‑focused Layer 1 blockchain that embeds decentralized oracles and cross‑chain protocols. Key features included:
+-   **Blockchain**: Flare Network (Coston2 Testnet)
+-   **Smart Contracts**: Solidity (Hardhat)
+-   **Frontend**: Next.js 15, Tailwind CSS v4, Framer Motion, Ethers.js v6
+-   **Oracles**:
+    -   **FTSO**: Real-time FLR/USD pricing.
+    -   **FDC (Simulation)**: Custom Weather Oracle for off-chain data verification.
+-   **Data Provider**: OpenWeatherMap API
 
-| Flare Technology | Role in CropGuard |
-| :--- | :--- |
-| **Flare Time Series Oracle (FTSO)** | Provides decentralized price feeds for commodities and stablecoins to calculate premiums and payouts in real-time. |
-| **Flare Data Connector (FDC)** | Allows smart contracts to verify off‑chain weather data from meteorological APIs (e.g., rainfall and temperature). |
-| **FAssets** | Trustless over‑collateralized bridge that wraps non‑smart‑contract assets (BTC, DOGE, XRP) into ERC‑20 tokens. Used for premiums and payouts. |
-| **Flare Smart Accounts** | Provide account abstraction, enabling gas‑less transactions, session keys, and social recovery for a seamless user experience. |
+## 📜 Deployed Contracts (Coston2)
 
-## System Architecture
+| Contract | Address | Notes |
+| :--- | :--- | :--- |
+| **PolicyManager** | `0x24d656DEa3a449A894d3fDEB93dAc30eCCe2bADD` | Core logic for policies |
+| **PayoutModule** | `0x6FA729B52166F31343753D5094251786A7604B50` | Handles FTSO pricing & payouts |
+| **CollateralPool** | `0xf56233d59470984baC403E53bd28905bF43C3A35` | Holds FLR liquidity |
+| **WeatherOracle** | `0xa896F4A547Fb1932Abad137907329ddf7B24b5dD` | MockFDC for weather data |
+| **FTSO Registry** | `0x48Da21ce34966A64E267CeFb78012C0282D0Ac87` | Official Coston2 Registry |
 
-```mermaid
-graph TD
-    User[Farmer] -->|Create Policy| FE[Front-End Dashboard]
-    FE -->|Sponsored Tx| SA[Flare Smart Account]
-    SA -->|Interact| SC[Smart Contracts]
-    
-    subgraph "On-Chain (Flare)"
-        SC --> PM[PolicyManager]
-        SC --> CP[CollateralPool]
-        SC --> Pay[PayoutModule]
-        Pay -->|Query Price| FTSO[FTSO Contract]
-        Pay -->|Verify Data| FDC[FDC Verification]
-    end
-    
-    subgraph "Off-Chain"
-        Script[Weather Oracle Script] -->|Fetch Data| API[Weather API]
-        Script -->|Submit Proof| FDC
-    end
-```
+## 📦 Installation & Setup
 
-## Required Technologies
-
--   **Flare Testnet**: Coston or Coston2.
--   **FTSO Contract Interface**: For price feeds.
--   **FDC Service**: For verifying weather data.
--   **FAssets**: FBTC/FDOGE for payments.
--   **Development**: Hardhat, Next.js, ethers.js.
-
-## Setup and Deployment
-
-### 1. clone the Repository
+### 1. Clone & Install
 ```bash
 git clone https://github.com/your-org/cropguard.git
 cd cropguard
+
+# Install dependencies (Root, Contract, App)
+npm install
+cd packages/contract && npm install
+cd ../app && npm install
 ```
 
-### 2. Install Dependencies
-```bash
-# Install root dependencies
-npm install
-
-# Install Contract dependencies
-cd packages/contract
-npm install
-
-# Install App dependencies
-cd ../app
-npm install
-```
-
-### 3. Configure Environment
-Create a `.env` file in `packages/contract` and `packages/app` with the following variables:
-
+### 2. Configure Environment
+Create `.env` in `packages/contract`:
 ```env
-FLARE_RPC_URL=https://coston2-api.flare.network/ext/C/rpc
-PRIVATE_KEY=<your_private_key>
-FTSO_FEED_ID=<feed_id>
-WEATHER_API_URL=https://api.openweathermap.org/data/2.5/onecall
-WEATHER_API_KEY=<your_weather_api_key>
-FDC_ENDPOINT=<fdc_endpoint>
-SMART_ACCOUNT_SPONSOR_KEY=<sponsor_private_key>
+PRIVATE_KEY=your_private_key
+WEATHER_API_KEY=your_openweathermap_key
 ```
 
-### 4. Deploy Smart Contracts
+### 3. Deploy Contracts (Optional)
+If you want to deploy your own instance:
 ```bash
 cd packages/contract
 npx hardhat run scripts/deploy-modules.js --network coston2
 ```
 
-### 5. Run the Application
+### 4. Run the App
+Start the frontend with the new neon-dark theme:
 ```bash
 cd packages/app
 npm run dev
 ```
+Open [http://localhost:3000](http://localhost:3000).
 
-## Contributing
--   **Smart Contract Engineer**: Implement `PolicyManager`, `CollateralPool`, `PayoutModule`.
--   **Off‑Chain Developer**: Build the weather oracle script.
--   **Front‑End Developer**: Develop the React dashboard.
+## 🎮 Usage Guide
+
+1.  **Connect Wallet**: Use MetaMask (switch to **Flare Coston2 Testnet**).
+2.  **Create Policy**: Go to the Dashboard, select "Wheat" or "Rice", and enter insured amount.
+    -   _Note: Premium is calculated live using FTSO prices._
+3.  **Monitor Status**: The dashboard shows live weather conditions fetched by the oracle.
+4.  **Trigger Payout**: Run the oracle script to simulate a weather event:
+    ```bash
+    cd packages/contract
+    node scripts/oracle/weather-oracle.js
+    ```
+    If conditions are met (e.g., Rain > Threshold), the contract pays out instantly.
+
+## 🏗 Architecture
+
+```mermaid
+graph TD
+    User[Farmer] -->|1. Pay Premium| PM[PolicyManager]
+    PM -->|2. Deposit| CP[CollateralPool]
+    
+    subgraph "Flare Network (Coston2)"
+        PM -->|3. Register| Pay[PayoutModule]
+        Pay -->|4. Get Price| FTSO[FTSO Registry]
+        Pay -->|5. Check Weather| WO[Weather Oracle]
+    end
+    
+    subgraph "Off-Chain"
+        Script[Oracle Script] -->|Fetch Weather| API[OpenWeatherMap]
+        Script -->|Submit Data| WO
+    end
+    
+    WO -->|6. Trigger Payout| Pay
+    Pay -->|7. Send Funds| User
+```
+
+## 📄 License
+MIT
