@@ -92,7 +92,7 @@ SMART_ACCOUNT_SPONSOR_KEY=<sponsor_private_key>
 ### 4. Deploy Smart Contracts
 ```bash
 cd packages/contract
-npx hardhat run scripts/deploy.js --network coston2
+npx hardhat run scripts/deploy-modules.js --network coston2
 ```
 
 ### 5. Run the Application

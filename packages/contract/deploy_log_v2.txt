@@ -1,0 +1,13 @@
+
+> crop-guard-contracts@1.0.0 deploy
+> hardhat run scripts/deploy-modules.js --network coston2
+
+Compiled 8 Solidity files successfully (evm target: paris).
+Deploying contracts with the account: 0x836607d30B1e50378529cb6E1C5C32165FB07cD4
+MockFTSO deployed to: 0xd67a077fa87aE85cF5AD1dc03AC52Ce40d5b85DF
+MockFDC deploy to: 0x11562e6A85833EC337FDb5d364fbf67E7581c291
+PolicyManager deployed to: 0x7CA5090C3f3f09c23e37e5352CDA797C22A603a3
+CollateralPool deployed to: 0xA397eae5256a9e8Cf1d9A425a22A9546d959Fe3a
+PayoutModule deployed to: 0xfe9f898C019f15C3E627fC969A8cAaD0f09Ca2aA
+Wiring modules...
+✅ Deployment Complete!

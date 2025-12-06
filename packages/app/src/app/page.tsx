@@ -6,8 +6,26 @@ import { ethers } from 'ethers';
 export default function Home() {
   const [account, setAccount] = useState<string | null>(null);
   const [status, setStatus] = useState<string>('');
+  const [loading, setLoading] = useState(false);
 
-  // Connect function
+  // Form State
+  const [location, setLocation] = useState('Bangalore');
+  const [cropType, setCropType] = useState('Wheat');
+  const [insuredAmount, setInsuredAmount] = useState('1000');
+
+  const POLICY_MANAGER_ADDRESS = "0x7CA5090C3f3f09c23e37e5352CDA797C22A603a3"; // Deployed on Coston2 (FAsset Ready)
+  const POLICY_MANAGER_ABI = require('./PolicyManagerABI.json');
+
+  // Load account on mount
+  useEffect(() => {
+    if ((window as any).ethereum) {
+      (window as any).ethereum.request({ method: 'eth_accounts' })
+        .then((accounts: string[]) => {
+          if (accounts.length > 0) setAccount(accounts[0]);
+        });
+    }
+  }, []);
+
   const connect = async () => {
     if ((window as any).ethereum) {
       try {
@@ -22,19 +40,39 @@ export default function Home() {
     }
   };
 
-  // Placeholder for PolicyManager ABI and Address
-  // In a real app, import from artifacts/contracts/modules/PolicyManager.sol/PolicyManager.json
-  const POLICY_MANAGER_ADDRESS = "0x5EFDbb2F25d944F39D59f654Bf28Ebd8d49CD3fE"; // Deployed on Coston2
-
   const purchasePolicy = async () => {
-    if (!account) return;
+    if (!account) {
+      alert("Please connect wallet first");
+      return;
+    }
+    setLoading(true);
     try {
-      // Mock interaction for Hackathon frontend prototype
-      // specific logic would require ethers.Contract with ABI
-      alert("Integrate PolicyManager.sol at " + POLICY_MANAGER_ADDRESS);
-      console.log("Buying policy for location: ", "Bangalore");
-    } catch (e) {
+      const provider = new ethers.BrowserProvider((window as any).ethereum);
+      const signer = await provider.getSigner();
+      const contract = new ethers.Contract(POLICY_MANAGER_ADDRESS, POLICY_MANAGER_ABI, signer);
+
+      // Calculate premium (Simple logic: 1% of insured amount for demo)
+      // insuredAmount is in USD (simulated), so we deposit FLR equivalent roughly
+      // For hackathon, let's just send 10 FLR as premium
+      const premium = ethers.parseEther("10");
+
+      const tx = await contract.createPolicy(
+        location,
+        cropType,
+        ethers.parseUnits(insuredAmount, 18),
+        30 * 24 * 60 * 60, // 30 days
+        { value: premium }
+      );
+
+      setStatus('Transaction Sent: ' + tx.hash);
+      await tx.wait();
+      setStatus('Policy Created Successfully! 🎉');
+
+    } catch (e: any) {
       console.error(e);
+      setStatus('Error: ' + (e.reason || e.message));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -65,11 +103,20 @@ export default function Home() {
             <form className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Location</label>
-                <input type="text" placeholder="e.g. Bangalore, IN" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none" />
+                <input
+                  type="text"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Crop Type</label>
-                <select className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none">
+                <select
+                  value={cropType}
+                  onChange={(e) => setCropType(e.target.value)}
+                  className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+                >
                   <option>Wheat</option>
                   <option>Rice</option>
                   <option>Maize</option>
@@ -77,11 +124,22 @@ export default function Home() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">Insured Amount (USD)</label>
-                <input type="number" placeholder="1000" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none" />
+                <input
+                  type="number"
+                  value={insuredAmount}
+                  onChange={(e) => setInsuredAmount(e.target.value)}
+                  className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+                />
               </div>
-              <button type="button" onClick={purchasePolicy} className="w-full bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition">
-                Calculate Premium & Pay
+              <button
+                type="button"
+                onClick={purchasePolicy}
+                disabled={loading}
+                className={`w-full text-white py-3 rounded-xl font-bold transition ${loading ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'}`}
+              >
+                {loading ? 'Processing...' : 'Calculate Premium & Pay (10 FLR)'}
               </button>
+              {status && <p className="text-center text-sm font-semibold text-green-800 mt-2">{status}</p>}
             </form>
           </div>
 
@@ -92,13 +150,13 @@ export default function Home() {
               <div className="space-y-4">
                 <div className="p-4 bg-green-50 rounded-lg border border-green-200">
                   <div className="flex justify-between">
-                    <span className="font-semibold">Policy #1024</span>
+                    <span className="font-semibold">Policy #--</span>
                     <span className="text-green-600 font-bold">Active</span>
                   </div>
-                  <p className="text-sm text-gray-600">Location: Bangalore</p>
-                  <p className="text-sm text-gray-600">Insured: $5,000</p>
+                  <p className="text-sm text-gray-600">Location: {location}</p>
+                  <p className="text-sm text-gray-600">Insured: ${insuredAmount}</p>
                 </div>
-                <p className="text-sm text-gray-500 italic">Weather conditions are currently normal.</p>
+                <p className="text-sm text-gray-500 italic">Global weather status: Monitoring...</p>
               </div>
             ) : (
               <p className="text-gray-500">Connect your wallet to view your policies.</p>

@@ -1,0 +1,4 @@
+[
+    "function createPolicy(string location, string cropType, uint256 insuredAmount, uint256 duration) public payable",
+    "function getPolicy(uint256 policyId) public view returns (tuple(address farmer, string location, string cropType, uint256 insuredAmount, uint256 premium, uint256 startTime, uint256 endTime, bool active, bool paidOut))"
+]
