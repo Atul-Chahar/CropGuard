@@ -22,6 +22,22 @@ export default function Home() {
     }
   };
 
+  // Placeholder for PolicyManager ABI and Address
+  // In a real app, import from artifacts/contracts/modules/PolicyManager.sol/PolicyManager.json
+  const POLICY_MANAGER_ADDRESS = "0x..."; // Deploy and update this
+
+  const purchasePolicy = async () => {
+    if (!account) return;
+    try {
+      // Mock interaction for Hackathon frontend prototype
+      // specific logic would require ethers.Contract with ABI
+      alert("Integrate PolicyManager.sol at " + POLICY_MANAGER_ADDRESS);
+      console.log("Buying policy for location: ", "Bangalore");
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-green-50 text-gray-800 font-sans">
       <header className="flex justify-between items-center p-6 bg-green-600 text-white shadow-lg">
@@ -63,7 +79,7 @@ export default function Home() {
                 <label className="block text-sm font-medium text-gray-700">Insured Amount (USD)</label>
                 <input type="number" placeholder="1000" className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none" />
               </div>
-              <button type="button" className="w-full bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition">
+              <button type="button" onClick={purchasePolicy} className="w-full bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition">
                 Calculate Premium & Pay
               </button>
             </form>
