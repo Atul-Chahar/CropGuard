@@ -9,7 +9,10 @@ async function main() {
     const envFtso = process.env.FTSO_REGISTRY_ADDRESS;
     const envFdc = process.env.FDC_CONTRACT_ADDRESS;
     const envWeatherAdapter = process.env.WEATHER_ADAPTER_ADDRESS;
-    const oracleSubmitter = process.env.WEATHER_SUBMITTER_ADDRESS || deployer.address;
+    const oracleSubmitters = (process.env.WEATHER_SUBMITTERS || process.env.WEATHER_SUBMITTER_ADDRESS || deployer.address)
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean);
 
     if (hre.network.name === "coston2") {
         console.log("Using Real Flare FTSO Registry on Coston2");
@@ -28,10 +31,15 @@ async function main() {
         } else {
             console.log("Deploying WeatherOracleAdapter...");
             const WeatherOracleAdapter = await hre.ethers.getContractFactory("WeatherOracleAdapter");
-            const adapter = await WeatherOracleAdapter.deploy(oracleSubmitter);
+            const adapter = await WeatherOracleAdapter.deploy(oracleSubmitters[0]);
             await adapter.waitForDeployment();
             weatherAdapterAddress = await adapter.getAddress();
             console.log("WeatherOracleAdapter deployed to:", weatherAdapterAddress);
+
+            // add any additional submitters
+            for (let i = 1; i < oracleSubmitters.length; i++) {
+                await adapter.setSubmitter(oracleSubmitters[i], true);
+            }
         }
 
     } else {

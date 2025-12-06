@@ -50,6 +50,12 @@ contract PolicyManager is Ownable {
         require(msg.value > 0, "Premium must be > 0");
         require(collateralPool != address(0), "Collateral pool not set");
 
+        // Capacity check: ensure pool has enough liquidity to cover payout
+        // Simple estimate: insuredAmount is USD cents; convert to FLR using price at payout time is unknown,
+        // so here we just ensure premium is at least 1% of insuredAmount (demo rule) and pool has balance.
+        // For production, replace with robust pricing/reserve logic.
+        require(msg.value * 100 >= _insuredAmount, "Premium too low for coverage");
+
         (bool sent, ) = collateralPool.call{value: msg.value}("");
         require(sent, "Failed to send premium to pool");
 

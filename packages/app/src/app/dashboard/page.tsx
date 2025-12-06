@@ -7,6 +7,7 @@ import { Shield, CloudRain, Wallet, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 
 const POLICY_MANAGER_ABI = require('../PolicyManagerABI.json');
+const COLLATERAL_POOL_ABI = require('../CollateralPoolABI.json');
 const WEATHER_ADAPTER_ABI = [
     "function isAdverse(string location) external view returns (bool)"
 ];
@@ -20,6 +21,7 @@ const CONFIG = {
     ftsoRegistry: process.env.NEXT_PUBLIC_FTSO_REGISTRY_ADDRESS || "0x48Da21ce34966A64E267CeFb78012C0282D0Ac87",
     ftsoSymbol: process.env.NEXT_PUBLIC_FTSO_SYMBOL || "C2FLR",
     rpcUrl: process.env.NEXT_PUBLIC_RPC_URL || "https://coston2-api.flare.network/ext/C/rpc",
+    collateralPool: process.env.NEXT_PUBLIC_COLLATERAL_POOL_ADDRESS || "0x0000000000000000000000000000000000000000",
 };
 
 export default function Dashboard() {
@@ -32,6 +34,11 @@ export default function Dashboard() {
     const [location, setLocation] = useState('Bangalore');
     const [cropType, setCropType] = useState('Wheat');
     const [insuredAmount, setInsuredAmount] = useState('1000');
+    const [stakeAmount, setStakeAmount] = useState('10');
+    const [unstakeAmount, setUnstakeAmount] = useState('0');
+    const [pendingRewards, setPendingRewards] = useState<string>('0');
+    const [poolLiquidity, setPoolLiquidity] = useState<string>('0');
+    const [poolStaked, setPoolStaked] = useState<string>('0');
     const [premiumFLR, setPremiumFLR] = useState('10.0000'); // 1 FLR per $100 insured
 
     // Chain data
@@ -51,6 +58,7 @@ export default function Dashboard() {
             const policyContract = new ethers.Contract(CONFIG.policyManager, POLICY_MANAGER_ABI, rpcProvider);
             const ftsoContract = new ethers.Contract(CONFIG.ftsoRegistry, FTSO_REGISTRY_ABI, rpcProvider);
             const weatherAdapter = new ethers.Contract(CONFIG.weatherAdapter, WEATHER_ADAPTER_ABI, rpcProvider);
+            const poolContract = new ethers.Contract(CONFIG.collateralPool, COLLATERAL_POOL_ABI, rpcProvider);
 
             const count: bigint = await policyContract.policyCount();
             if (count > 0n) {
@@ -78,6 +86,22 @@ export default function Dashboard() {
                 setFlrPrice(`$${formatted.toFixed(6)} (${CONFIG.ftsoSymbol})`);
             } catch (err) {
                 setFlrPrice('Unavailable');
+            }
+
+            try {
+                const liquidity: bigint = await poolContract.totalLiquidity();
+                const staked: bigint = await poolContract.totalStakedFLR();
+                setPoolLiquidity(ethers.formatEther(liquidity));
+                setPoolStaked(ethers.formatEther(staked));
+
+                if (account) {
+                    const pending: bigint = await poolContract.pendingRewards(account);
+                    setPendingRewards(ethers.formatEther(pending));
+                } else {
+                    setPendingRewards('0');
+                }
+            } catch (err) {
+                console.error('Failed to load pool data', err);
             }
         } catch (err: any) {
             console.error('Failed to load chain data', err);
@@ -151,6 +175,76 @@ export default function Dashboard() {
             }
         } finally {
             setLoading(false);
+        }
+    };
+
+    const stakeFLR = async () => {
+        if (!account) {
+            alert("Please connect wallet first");
+            return;
+        }
+        const amt = Number(stakeAmount);
+        if (!amt || amt <= 0) {
+            alert("Stake amount must be greater than zero");
+            return;
+        }
+        try {
+            const provider = new ethers.BrowserProvider((window as any).ethereum);
+            const signer = await provider.getSigner();
+            const pool = new ethers.Contract(CONFIG.collateralPool, COLLATERAL_POOL_ABI, signer);
+            const tx = await pool.stake({ value: ethers.parseEther(amt.toFixed(6)) });
+            setStatus('Staking TX: ' + tx.hash);
+            await tx.wait();
+            setStatus('Staked successfully');
+            await loadChainData();
+        } catch (e: any) {
+            console.error(e);
+            setStatus('Error staking: ' + (e.reason || e.message || "Unknown"));
+        }
+    };
+
+    const unstakeFLR = async () => {
+        if (!account) {
+            alert("Please connect wallet first");
+            return;
+        }
+        const amt = Number(unstakeAmount);
+        if (!amt || amt <= 0) {
+            alert("Unstake amount must be greater than zero");
+            return;
+        }
+        try {
+            const provider = new ethers.BrowserProvider((window as any).ethereum);
+            const signer = await provider.getSigner();
+            const pool = new ethers.Contract(CONFIG.collateralPool, COLLATERAL_POOL_ABI, signer);
+            const tx = await pool.unstake(ethers.parseEther(amt.toFixed(6)));
+            setStatus('Unstake TX: ' + tx.hash);
+            await tx.wait();
+            setStatus('Unstaked successfully');
+            await loadChainData();
+        } catch (e: any) {
+            console.error(e);
+            setStatus('Error unstaking: ' + (e.reason || e.message || "Unknown"));
+        }
+    };
+
+    const claimRewards = async () => {
+        if (!account) {
+            alert("Please connect wallet first");
+            return;
+        }
+        try {
+            const provider = new ethers.BrowserProvider((window as any).ethereum);
+            const signer = await provider.getSigner();
+            const pool = new ethers.Contract(CONFIG.collateralPool, COLLATERAL_POOL_ABI, signer);
+            const tx = await pool.claimRewards();
+            setStatus('Claim TX: ' + tx.hash);
+            await tx.wait();
+            setStatus('Rewards claimed');
+            await loadChainData();
+        } catch (e: any) {
+            console.error(e);
+            setStatus('Error claiming: ' + (e.reason || e.message || "Unknown"));
         }
     };
 
@@ -324,6 +418,67 @@ export default function Dashboard() {
                             ) : (
                                 <p className="text-gray-500 text-sm">Connect wallet to view details.</p>
                             )}
+                        </div>
+
+                        <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl shadow-2xl p-6">
+                            <h3 className="text-lg font-bold mb-4 text-white">Provide Liquidity (Stake FLR)</h3>
+                            <div className="space-y-3">
+                                <div className="flex justify-between text-sm text-gray-400">
+                                    <span>Total Pool Liquidity</span>
+                                    <span className="text-white">{poolLiquidity} FLR</span>
+                                </div>
+                                <div className="flex justify-between text-sm text-gray-400">
+                                    <span>Total Staked</span>
+                                    <span className="text-white">{poolStaked} FLR</span>
+                                </div>
+                                <div className="flex justify-between text-sm text-gray-400">
+                                    <span>Your Pending Rewards</span>
+                                    <span className="text-[#00ff9d]">{pendingRewards} FLR</span>
+                                </div>
+                            </div>
+
+                            <div className="mt-6 space-y-3">
+                                <div>
+                                    <label className="text-sm text-gray-400">Stake FLR</label>
+                                    <div className="flex gap-3 mt-1">
+                                        <input
+                                            type="number"
+                                            value={stakeAmount}
+                                            onChange={(e) => setStakeAmount(e.target.value)}
+                                            className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-[#00ff9d]/50 transition-colors"
+                                        />
+                                        <button
+                                            onClick={stakeFLR}
+                                            className="bg-[#00ff9d] text-black px-4 py-3 rounded-xl font-bold hover:shadow-[0_0_12px_rgba(0,255,157,0.4)] transition-all"
+                                        >
+                                            Stake
+                                        </button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-sm text-gray-400">Unstake FLR</label>
+                                    <div className="flex gap-3 mt-1">
+                                        <input
+                                            type="number"
+                                            value={unstakeAmount}
+                                            onChange={(e) => setUnstakeAmount(e.target.value)}
+                                            className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-[#00ff9d]/50 transition-colors"
+                                        />
+                                        <button
+                                            onClick={unstakeFLR}
+                                            className="bg-white/5 text-white border border-white/10 px-4 py-3 rounded-xl font-bold hover:bg-white/10 transition-all"
+                                        >
+                                            Unstake
+                                        </button>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={claimRewards}
+                                    className="w-full bg-white/5 text-white border border-white/10 px-4 py-3 rounded-xl font-bold hover:bg-white/10 transition-all"
+                                >
+                                    Claim Rewards
+                                </button>
+                            </div>
                         </div>
                     </motion.div>
                 </div>

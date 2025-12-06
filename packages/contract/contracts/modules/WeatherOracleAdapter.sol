@@ -11,26 +11,26 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract WeatherOracleAdapter is Ownable {
     // location => adverse weather flag
     mapping(string => bool) public adverseWeather;
+    mapping(address => bool) public submitters;
 
-    address public submitter;
-
-    event SubmitterUpdated(address indexed newSubmitter);
+    event SubmitterUpdated(address indexed submitter, bool allowed);
     event WeatherUpdated(string indexed location, bool adverse);
 
     constructor(address _submitter) Ownable(msg.sender) {
-        submitter = _submitter;
+        submitters[_submitter] = true;
+        emit SubmitterUpdated(_submitter, true);
     }
 
-    function setSubmitter(address _submitter) external onlyOwner {
-        submitter = _submitter;
-        emit SubmitterUpdated(_submitter);
+    function setSubmitter(address _submitter, bool allowed) external onlyOwner {
+        submitters[_submitter] = allowed;
+        emit SubmitterUpdated(_submitter, allowed);
     }
 
     /**
      * @dev Temporary write without proof. Replace with proof verification when integrating full FDC flow.
      */
     function setWeather(string calldata location, bool isAdverse) external {
-        require(msg.sender == submitter, "Not authorized");
+        require(submitters[msg.sender], "Not authorized");
         adverseWeather[location] = isAdverse;
         emit WeatherUpdated(location, isAdverse);
     }

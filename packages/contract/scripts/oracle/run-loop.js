@@ -1,6 +1,6 @@
 const { runOracle } = require('./weather-oracle');
 
-const INTERVAL_MS = Number(process.env.ORACLE_INTERVAL_MS || 300000); // default 5 minutes
+const INTERVAL_MS = Number(process.env.ORACLE_INTERVAL_MS || 30000); // default 30 seconds (override via ORACLE_INTERVAL_MS)
 
 async function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));

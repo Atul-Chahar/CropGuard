@@ -3,9 +3,9 @@
 Parametric crop insurance dapp on Flare Coston2. Frontend is Next.js/Tailwind; smart contracts are Hardhat. Weather status is written on-chain through a WeatherOracleAdapter, and payouts use FTSO price feeds.
 
 ## Current deployed addresses (Coston2)
-- PolicyManager: `0xfECdf117496b988b30c8a1eef36de3a3bC5Ed36b`
-- CollateralPool: `0x17A1cFADc601f25d536Fa1dAB64A08bFBD94e1DC`
-- PayoutModule: `0xfCB173a1c6a4B187811d7513A6a62720b42F1cA7`
+- PolicyManager: `0x4aDEea1FEa03a462720C38BAb146934cfd96F924`
+- CollateralPool: `0x5Ed6CF1ADf3330F61D666D3336a2d59eeeA7E0fE`
+- PayoutModule: `0xCF8B54c0D4f10a05254a007f24F099aBFEd585c7`
 - WeatherOracleAdapter: `0x0Fd10bb23f3D17a149FFC0c0e7AA4eBE82eD9226`
 - FdcHub (attestation): `0x48aC463d7975828989331F4De43341627b9c5f1D`
 - FTSO Registry: `0x48Da21ce34966A64E267CeFb78012C0282D0Ac87`
@@ -54,6 +54,19 @@ cd packages/contract
 npx hardhat run scripts/oracle/run-loop.js --network coston2
 ```
 This keeps running the oracle cycle continuously so users don’t need to run it manually.
+
+## Staking / Liquidity (collateral providers)
+- Staking is handled by `CollateralPool` and surfaced in the dashboard.
+- Rule (demo): premium is 1 FLR per $100 insured, and premiums are distributed to stakers pro-rata.
+- Stake FLR: enter an amount and click “Stake” (gas + amount in FLR).
+- Unstake FLR: enter an amount and click “Unstake”.
+- Claim rewards: click “Claim Rewards” to withdraw accumulated premiums.
+
+## Demo control panel (set weather / trigger payout)
+- Visit `/control` in the app (http://localhost:3000/control).
+- Connect with the oracle submitter wallet (env: `NEXT_PUBLIC_ORACLE_SUBMITTER_ADDRESS`).
+- Set a location to Normal/Adverse (writes to WeatherOracleAdapter).
+- Optionally trigger payout for the latest policy via the button (calls `checkAndPayout`).
 
 ## Notes
 - WeatherOracleAdapter is a temporary store for weather status; when FDC proof verification is integrated, replace the direct write with proof-based verification.
