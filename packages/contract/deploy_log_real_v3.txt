@@ -1,0 +1,13 @@
+
+> crop-guard-contracts@1.0.0 deploy
+> hardhat run scripts/deploy-modules.js --network coston2
+
+Deploying contracts with the account: 0x836607d30B1e50378529cb6E1C5C32165FB07cD4
+Using Real Flare FTSO Registry on Coston2
+Deploying Custom Weather Oracle (MockFDC)...
+Custom Weather Oracle deployed to: 0x7964f571e9f61163A6089718c82D8611D2AfBcab
+PolicyManager deployed to: 0x4D800a55Ccbac49473476D976afE0c83973d043a
+CollateralPool deployed to: 0x9F57b3Ca4Bc95544dD2f0F4b514D01630A0Dfaf5
+PayoutModule deployed to: 0x0031E3A13c2Fa56CE3fAe4355197c8F69855D853
+Wiring modules...
+✅ Deployment Complete (Real FTSO + Custom Oracle)!

@@ -4,19 +4,37 @@ async function main() {
     const [deployer] = await hre.ethers.getSigners();
     console.log("Deploying contracts with the account:", deployer.address);
 
-    // 1. Deploy Mocks (if on testnet/local without real FTSO/FDC)
-    // For Hackathon, we might want to deploy mocks even on testnet if access is tricky, 
-    // but let's assume we use Mocks for the FDC part at least.
+    // 1. Setup Addresses
+    let ftsoAddress, fdcAddress;
 
-    const MockFTSO = await hre.ethers.getContractFactory("MockFTSO");
-    const mockFtso = await MockFTSO.deploy(10000000, 5); // Price: 100.00000, Decimals: 5
-    await mockFtso.waitForDeployment();
-    console.log("MockFTSO deployed to:", await mockFtso.getAddress());
+    if (hre.network.name === "coston2") {
+        console.log("Using Real Flare FTSO Registry on Coston2");
+        ftsoAddress = "0x48Da21ce34966A64E267CeFb78012C0282D0Ac87"; // FtsoRegistry
 
-    const MockFDC = await hre.ethers.getContractFactory("MockFDC");
-    const mockFdc = await MockFDC.deploy();
-    await mockFdc.waitForDeployment();
-    console.log("MockFDC deploy to:", await mockFdc.getAddress());
+        // For FDC, we still need our custom weather logic (isRainy).
+        // Real FdcHub is for verification, not storage of arbitrary weather state.
+        // So we deploy our own 'Oracle' for weather but call it FDC for architecture.
+        console.log("Deploying Custom Weather Oracle (MockFDC)...");
+        const MockFDC = await hre.ethers.getContractFactory("MockFDC");
+        const mockFdc = await MockFDC.deploy();
+        await mockFdc.waitForDeployment();
+        fdcAddress = await mockFdc.getAddress();
+        console.log("Custom Weather Oracle deployed to:", fdcAddress);
+
+    } else {
+        console.log("Deploying Mocks...");
+        const MockFTSO = await hre.ethers.getContractFactory("MockFTSO");
+        const mockFtso = await MockFTSO.deploy(10000000, 5);
+        await mockFtso.waitForDeployment();
+        ftsoAddress = await mockFtso.getAddress();
+        console.log("MockFTSO deployed to:", ftsoAddress);
+
+        const MockFDC = await hre.ethers.getContractFactory("MockFDC");
+        const mockFdc = await MockFDC.deploy();
+        await mockFdc.waitForDeployment();
+        fdcAddress = await mockFdc.getAddress();
+        console.log("MockFDC deployed to:", fdcAddress);
+    }
 
     // 2. Deploy Modules
     const PolicyManager = await hre.ethers.getContractFactory("PolicyManager");
@@ -33,8 +51,8 @@ async function main() {
     const payoutModule = await PayoutModule.deploy(
         await policyManager.getAddress(),
         await collateralPool.getAddress(),
-        await mockFtso.getAddress(), // Use Real FTSO address in production
-        await mockFdc.getAddress()   // Use Real FDC address in production
+        ftsoAddress,
+        fdcAddress
     );
     await payoutModule.waitForDeployment();
     console.log("PayoutModule deployed to:", await payoutModule.getAddress());
@@ -45,7 +63,7 @@ async function main() {
     await policyManager.setPayoutModule(await payoutModule.getAddress());
     await collateralPool.setModules(await policyManager.getAddress(), await payoutModule.getAddress());
 
-    console.log("✅ Deployment Complete!");
+    console.log("✅ Deployment Complete (Real FTSO + Custom Oracle)!");
 }
 
 main().catch((error) => {
