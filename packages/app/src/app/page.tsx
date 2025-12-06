@@ -24,7 +24,7 @@ export default function Home() {
 
   // Placeholder for PolicyManager ABI and Address
   // In a real app, import from artifacts/contracts/modules/PolicyManager.sol/PolicyManager.json
-  const POLICY_MANAGER_ADDRESS = "0x..."; // Deploy and update this
+  const POLICY_MANAGER_ADDRESS = "0x5EFDbb2F25d944F39D59f654Bf28Ebd8d49CD3fE"; // Deployed on Coston2
 
   const purchasePolicy = async () => {
     if (!account) return;

@@ -26,7 +26,7 @@ contract PayoutModule is Ownable {
         address _fdc
     ) Ownable(msg.sender) {
         policyManager = PolicyManager(_policyManager);
-        collateralPool = CollateralPool(_collateralPool);
+        collateralPool = CollateralPool(payable(_collateralPool));
         ftsoRegistry = IFtsoRegistry(_ftsoRegistry);
         fdc = IFDC(_fdc);
     }

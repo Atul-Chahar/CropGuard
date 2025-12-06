@@ -5,7 +5,7 @@ require('dotenv').config();
 // Configuration
 const WEATHER_API_URL = process.env.WEATHER_API_URL || 'https://api.openweathermap.org/data/2.5/weather';
 const WEATHER_API_KEY = process.env.WEATHER_API_KEY; // User needs to provide this
-const FDC_CONTRACT_ADDRESS = process.env.FDC_CONTRACT_ADDRESS; // Set after deployment
+const FDC_CONTRACT_ADDRESS = process.env.FDC_CONTRACT_ADDRESS || '0xAa8c467F24f9B730e7C7940BC79C4aF706EaEA8d'; // MockFDC on Coston2
 
 async function fetchWeatherData(location) {
     if (!WEATHER_API_KEY) {
@@ -48,9 +48,9 @@ async function main() {
     const data = await fetchWeatherData(location);
 
     if (data) {
-        console.log(\`📍 Location: \${location} | Temp: \${data.temp}°C | Rain: \${data.rain}mm\`);
-        console.log(\`⚠️ Adverse Weather? \${data.isRainy ? 'YES' : 'NO'}\`);
-        
+        console.log(`📍 Location: ${location} | Temp: ${data.temp}°C | Rain: ${data.rain}mm`);
+        console.log(`⚠️ Adverse Weather? ${data.isRainy ? 'YES' : 'NO'}`);
+
         if (data.isRainy) {
             console.log("🚀 Submitting verification to FDC...");
             // Logic to call submitVerification on FDC contract

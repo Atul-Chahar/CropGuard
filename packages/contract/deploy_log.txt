@@ -1,0 +1,12 @@
+
+> crop-guard-contracts@1.0.0 deploy
+> hardhat run scripts/deploy-modules.js --network coston2
+
+Deploying contracts with the account: 0x836607d30B1e50378529cb6E1C5C32165FB07cD4
+MockFTSO deployed to: 0x0b4F095dCf605da5558deaFb3Ea2ff7621f53FaA
+MockFDC deploy to: 0xAa8c467F24f9B730e7C7940BC79C4aF706EaEA8d
+PolicyManager deployed to: 0x5EFDbb2F25d944F39D59f654Bf28Ebd8d49CD3fE
+CollateralPool deployed to: 0xE71Ef067C9EE86b34B541657704025495e925969
+PayoutModule deployed to: 0x04A9874D53D27Cdfb1e3090DcE6093BC16249108
+Wiring modules...
+✅ Deployment Complete!

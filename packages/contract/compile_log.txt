@@ -1,0 +1,27 @@
+[1m[33mWarning:[39m[22m This declaration has the same name as another declaration.
+ --> contracts/MockFDC.sol:7:49:
+  |
+7 |     function setWeather(string memory location, bool isRainy) external {
+  |                                                 ^^^^^^^^^^^^
+Note: The other declaration is here:
+  --> contracts/MockFDC.sol:11:5:
+   |
+11 |     function isRainy(string memory location, uint256 /*timestamp*/) external view returns (bool) {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+
+[1m[31mTypeError:[39m[22m Explicit type conversion not allowed from non-payable "address" to "contract CollateralPool", which has a payable fallback function.
+  --> contracts/modules/PayoutModule.sol:29:26:
+   |
+29 |         collateralPool = CollateralPool(_collateralPool);
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Note: Did you mean to declare this variable as "address payable"?
+  --> contracts/modules/PayoutModule.sol:24:9:
+   |
+24 |         address _collateralPool, 
+   |         ^^^^^^^^^^^^^^^^^^^^^^^
+
+
+[31m[1mError[22m[39m [31m[1mHH600:[22m[39m Compilation failed
+
+For more info go to https://v2.hardhat.org/HH600 or run Hardhat with --show-stack-traces
