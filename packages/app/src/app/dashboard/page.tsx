@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ethers } from 'ethers';
 import { motion } from 'framer-motion';
-import { Shield, CloudRain, Wallet, ChevronRight } from 'lucide-react';
+import { Shield, CloudRain, Wallet, ChevronRight, Info } from 'lucide-react';
 import Link from 'next/link';
 
 const POLICY_MANAGER_ABI = require('../PolicyManagerABI.json');
@@ -24,6 +24,19 @@ const CONFIG = {
     collateralPool: process.env.NEXT_PUBLIC_COLLATERAL_POOL_ADDRESS || "0x0000000000000000000000000000000000000000",
 };
 
+type Policy = {
+    farmer: string;
+    location: string;
+    cropType: string;
+    insuredAmount: bigint;
+    premium: bigint;
+    premiumToken: string;
+    startTime: bigint;
+    endTime: bigint;
+    active: boolean;
+    paidOut: boolean;
+};
+
 export default function Dashboard() {
     const [account, setAccount] = useState<string | null>(null);
     const [status, setStatus] = useState<string>('');
@@ -42,13 +55,16 @@ export default function Dashboard() {
     const [premiumFLR, setPremiumFLR] = useState('10.0000'); // 1 FLR per $100 insured
 
     // Chain data
-    const [latestPolicyId, setLatestPolicyId] = useState<number | null>(null);
-    const [latestPolicyLocation, setLatestPolicyLocation] = useState<string>('');
-    const [policyStatus, setPolicyStatus] = useState<string>('Not created yet');
+    const [policies, setPolicies] = useState<{ id: number; data: Policy }[]>([]);
+    const [selectedPolicyId, setSelectedPolicyId] = useState<number | null>(null);
+    const [policyStatus, setPolicyStatus] = useState<string>('No policies yet');
+    const [policyLocation, setPolicyLocation] = useState<string>('');
     const [weatherStatus, setWeatherStatus] = useState<string>('Unknown');
     const [oracleOnline, setOracleOnline] = useState<boolean>(false);
     const [flrPrice, setFlrPrice] = useState<string>('');
     const [insuredAmountDisplay, setInsuredAmountDisplay] = useState<string>('');
+    const [payoutEstimate, setPayoutEstimate] = useState<string>('');
+    const [capacityWarning, setCapacityWarning] = useState<string>('');
 
     const rpcProvider = useMemo(() => new ethers.JsonRpcProvider(CONFIG.rpcUrl), []);
 
@@ -60,32 +76,69 @@ export default function Dashboard() {
             const weatherAdapter = new ethers.Contract(CONFIG.weatherAdapter, WEATHER_ADAPTER_ABI, rpcProvider);
             const poolContract = new ethers.Contract(CONFIG.collateralPool, COLLATERAL_POOL_ABI, rpcProvider);
 
-            const count: bigint = await policyContract.policyCount();
-            if (count > BigInt(0)) {
-                const policy = await policyContract.getPolicy(count);
-                setLatestPolicyId(Number(count));
-                setLatestPolicyLocation(policy.location);
-                setPolicyStatus(policy.paidOut ? 'Paid out' : policy.active ? 'Active' : 'Inactive');
-                setInsuredAmountDisplay((Number(policy.insuredAmount) / 100).toFixed(2)); // cents -> USD
-
-                try {
-                    const isAdverse: boolean = await weatherAdapter.isAdverse(policy.location);
-                    setWeatherStatus(isAdverse ? 'Adverse (rain/heat)' : 'Normal');
-                    setOracleOnline(true);
-                } catch (err) {
-                    setWeatherStatus('Unavailable (WeatherAdapter call failed)');
-                    setOracleOnline(false);
-                }
-            } else {
-                setPolicyStatus('No policies yet');
-            }
-
+            // load price first
+            let price: bigint = BigInt(0);
+            let priceDecimals: bigint = BigInt(0);
             try {
-                const [price, , decimals]: [bigint, bigint, bigint] = await ftsoContract.getCurrentPriceWithDecimals(CONFIG.ftsoSymbol);
-                const formatted = Number(price) / Number((BigInt(10) ** decimals));
+                const [p, , d]: [bigint, bigint, bigint] = await ftsoContract.getCurrentPriceWithDecimals(CONFIG.ftsoSymbol);
+                price = p;
+                priceDecimals = d;
+                const formatted = Number(p) / Number((BigInt(10) ** d));
                 setFlrPrice(`$${formatted.toFixed(6)} (${CONFIG.ftsoSymbol})`);
             } catch (err) {
                 setFlrPrice('Unavailable');
+            }
+
+            // policies list
+            const count: bigint = await policyContract.policyCount();
+            const all: { id: number; data: Policy }[] = [];
+            for (let i = 1; i <= Number(count); i++) {
+                const p: Policy = await policyContract.getPolicy(i);
+                all.push({ id: i, data: p });
+            }
+            setPolicies(all);
+            const latest = all.length ? all[all.length - 1] : null;
+            const activeSelection = selectedPolicyId || (latest ? latest.id : null);
+            setSelectedPolicyId(activeSelection);
+
+            if (activeSelection) {
+                const policy = all.find(p => p.id === activeSelection)?.data;
+                if (policy) {
+                    setPolicyStatus(policy.paidOut ? 'Paid out' : policy.active ? 'Active' : 'Inactive');
+                    setPolicyLocation(policy.location);
+                    setInsuredAmountDisplay((Number(policy.insuredAmount) / 100).toFixed(2)); // cents -> USD
+                    try {
+                        const isAdverse: boolean = await weatherAdapter.isAdverse(policy.location);
+                        setWeatherStatus(isAdverse ? 'Adverse (rain/heat)' : 'Normal');
+                        setOracleOnline(true);
+                    } catch (err) {
+                        setWeatherStatus('Unavailable (WeatherAdapter call failed)');
+                        setOracleOnline(false);
+                    }
+
+                    // estimate payout vs liquidity
+                    let payoutText = '';
+                    let warnText = '';
+                    if (price > BigInt(0) && priceDecimals > BigInt(0)) {
+                        const payout = (policy.insuredAmount * (BigInt(10) ** priceDecimals)) / (price * BigInt(100));
+                        payoutText = `${ethers.formatEther(payout)} FLR`; // approximate
+                        try {
+                            const avail: bigint = await poolContract.availableLiquidity();
+                            if (avail < payout) {
+                                warnText = `Pool liquidity too low for this payout (needs ~${ethers.formatEther(payout)} FLR, has ${ethers.formatEther(avail)} FLR)`;
+                            }
+                        } catch (err) {
+                            // ignore
+                        }
+                    }
+                    setPayoutEstimate(payoutText);
+                    setCapacityWarning(warnText);
+                }
+            } else {
+                setPolicyStatus('No policies yet');
+                setInsuredAmountDisplay('');
+                setPayoutEstimate('');
+                setCapacityWarning('');
             }
 
             try {
@@ -109,7 +162,7 @@ export default function Dashboard() {
         } finally {
             setChainLoading(false);
         }
-    }, [rpcProvider, account]);
+    }, [rpcProvider, account, selectedPolicyId]);
 
     useEffect(() => {
         if ((window as any).ethereum) {
@@ -137,12 +190,12 @@ export default function Dashboard() {
 
     const purchasePolicy = async () => {
         if (!account) {
-            alert("Please connect wallet first");
+            setStatus('Please connect wallet first');
             return;
         }
         const premiumNum = Number(premiumFLR);
         if (!premiumNum || premiumNum <= 0) {
-            alert("Premium must be greater than zero");
+            setStatus('Premium must be greater than zero');
             return;
         }
         setLoading(true);
@@ -164,6 +217,7 @@ export default function Dashboard() {
             setStatus('Transaction Sent: ' + tx.hash);
             await tx.wait();
             setStatus('Policy Created Successfully! 🎉');
+            setSelectedPolicyId(null);
             await loadChainData();
 
         } catch (e: any) {
@@ -180,12 +234,12 @@ export default function Dashboard() {
 
     const stakeFLR = async () => {
         if (!account) {
-            alert("Please connect wallet first");
+            setStatus('Please connect wallet first');
             return;
         }
         const amt = Number(stakeAmount);
         if (!amt || amt <= 0) {
-            alert("Stake amount must be greater than zero");
+            setStatus('Stake amount must be greater than zero');
             return;
         }
         try {
@@ -205,12 +259,12 @@ export default function Dashboard() {
 
     const unstakeFLR = async () => {
         if (!account) {
-            alert("Please connect wallet first");
+            setStatus('Please connect wallet first');
             return;
         }
         const amt = Number(unstakeAmount);
         if (!amt || amt <= 0) {
-            alert("Unstake amount must be greater than zero");
+            setStatus('Unstake amount must be greater than zero');
             return;
         }
         try {
@@ -230,7 +284,7 @@ export default function Dashboard() {
 
     const claimRewards = async () => {
         if (!account) {
-            alert("Please connect wallet first");
+            setStatus('Please connect wallet first');
             return;
         }
         try {
@@ -289,10 +343,11 @@ export default function Dashboard() {
                         <div className="text-sm text-gray-500">Policy + Weather + Price</div>
                     </div>
 
-                    <div className="grid md:grid-cols-3 gap-4">
+                    <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
                         <StatCard label="Policy Status" value={policyStatus} accent="text-[#00ff9d]"/>
                         <StatCard label="FLR Price" value={flrPrice || 'Loading...'} />
                         <StatCard label="Condition" value={weatherStatus} accent={weatherStatus.includes('Adverse') ? 'text-red-400' : 'text-green-400'} />
+                        <StatCard label="Payout Estimate" value={payoutEstimate || '...'} />
                     </div>
 
                     <div className="grid lg:grid-cols-3 gap-6 items-start">
@@ -368,7 +423,7 @@ export default function Dashboard() {
                                     {!loading && <ChevronRight className="w-5 h-5 ml-2" />}
                                 </button>
                             </div>
-                            {status && <p className="mt-4 text-center text-sm text-[#00ff9d]">{status}</p>}
+                            {status && <Alert text={status} />}
                         </motion.div>
 
                         <motion.div
@@ -379,16 +434,35 @@ export default function Dashboard() {
                         >
                             <h3 className="text-lg font-bold mb-4 flex items-center text-white">
                                 <CloudRain className="w-5 h-5 text-blue-400 mr-2" />
-                                Weather & Policy Status
+                                Weather & Policies
                             </h3>
+
+                            <div className="space-y-2 mb-4">
+                                <label className="text-sm text-gray-400">Select Policy</label>
+                                <select
+                                    value={selectedPolicyId || ''}
+                                    onChange={(e) => setSelectedPolicyId(Number(e.target.value) || null)}
+                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-[#00ff9d]/50 transition-colors [&>option]:bg-black"
+                                >
+                                    <option value="">Latest</option>
+                                    {policies.map(p => (
+                                        <option key={p.id} value={p.id}>
+                                            #{p.id} · {p.data.location} · {p.data.paidOut ? 'Paid' : p.data.active ? 'Active' : 'Inactive'}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
                             <div className="space-y-3">
-                                <StatusRow label="Latest Policy" value={chainLoading ? 'Loading...' : latestPolicyId ? `#${latestPolicyId}` : 'None'} />
-                                <StatusRow label="Location" value={latestPolicyLocation || location} />
+                                <StatusRow label="Latest Policy" value={chainLoading ? 'Loading...' : selectedPolicyId ? `#${selectedPolicyId}` : policies.length ? `#${policies[policies.length-1].id}` : 'None'} />
+                                <StatusRow label="Location" value={policyLocation || location} />
                                 <StatusRow label="Condition" value={chainLoading ? 'Checking...' : weatherStatus} valueClass={weatherStatus.includes('Adverse') ? 'text-red-400' : 'text-green-400'} />
                                 <StatusRow label="Oracle" value={oracleOnline ? 'Online' : 'Offline'} valueClass={oracleOnline ? 'text-[#00ff9d]' : 'text-red-400'} />
                                 <StatusRow label="FLR Price" value={flrPrice || 'Loading...'} />
                                 <StatusRow label="Status" value={policyStatus} />
                                 {insuredAmountDisplay && <StatusRow label="Insured Value" value={`$${insuredAmountDisplay}`} />}
+                                {payoutEstimate && <StatusRow label="Payout Est." value={payoutEstimate} />}
+                                {capacityWarning && <Alert text={capacityWarning} tone="warning" />}
                             </div>
                         </motion.div>
                     </div>
@@ -508,6 +582,17 @@ function StatusRow({ label, value, valueClass, compact }: { label: string; value
         <div className={`flex ${compact ? 'text-xs' : 'text-sm'} justify-between items-center p-3 rounded-lg bg-white/5`}>
             <span className="text-gray-400">{label}</span>
             <span className={`font-medium ${valueClass || 'text-white'}`}>{value}</span>
+        </div>
+    );
+}
+
+function Alert({ text, tone }: { text: string; tone?: 'warning' | 'error' | 'info' }) {
+    const color = tone === 'warning' ? 'text-yellow-300' : tone === 'error' ? 'text-red-300' : 'text-[#00ff9d]';
+    const border = tone === 'warning' ? 'border-yellow-500/50' : tone === 'error' ? 'border-red-500/50' : 'border-[#00ff9d]/40';
+    return (
+        <div className={`mt-3 bg-white/5 border ${border} rounded-xl p-3 text-sm flex items-center gap-2`}>            
+            <Info className={`w-4 h-4 ${color}`} />
+            <span className={color}>{text}</span>
         </div>
     );
 }
