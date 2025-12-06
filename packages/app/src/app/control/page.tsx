@@ -59,7 +59,7 @@ export default function ControlPanel() {
       const policyContract = new ethers.Contract(CONFIG.policyManager, POLICY_MANAGER_ABI, rpcProvider);
       const adapter = new ethers.Contract(CONFIG.weatherAdapter, WEATHER_ADAPTER_ABI, rpcProvider);
       const count: bigint = await policyContract.policyCount();
-      if (count > 0n) {
+      if (count > BigInt(0)) {
         const id = Number(count);
         setLatestPolicyId(id);
         const p = await policyContract.getPolicy(id);
@@ -95,7 +95,7 @@ export default function ControlPanel() {
       const provider = new ethers.BrowserProvider((window as any).ethereum);
       const signer = await provider.getSigner();
       const signerAddr = (await signer.getAddress()).toLowerCase();
-      if (CONFIG.submitter && signerAddr !== CONFIG.submitter) {
+      if (CONFIG.submitters.length > 0 && !CONFIG.submitters.includes(signerAddr)) {
         setStatus('Not authorized: connect with oracle submitter address');
         return;
       }

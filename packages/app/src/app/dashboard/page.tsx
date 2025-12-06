@@ -61,7 +61,7 @@ export default function Dashboard() {
             const poolContract = new ethers.Contract(CONFIG.collateralPool, COLLATERAL_POOL_ABI, rpcProvider);
 
             const count: bigint = await policyContract.policyCount();
-            if (count > 0n) {
+            if (count > BigInt(0)) {
                 const policy = await policyContract.getPolicy(count);
                 setLatestPolicyId(Number(count));
                 setLatestPolicyLocation(policy.location);
@@ -82,7 +82,7 @@ export default function Dashboard() {
 
             try {
                 const [price, , decimals]: [bigint, bigint, bigint] = await ftsoContract.getCurrentPriceWithDecimals(CONFIG.ftsoSymbol);
-                const formatted = Number(price) / Number(10n ** decimals);
+                const formatted = Number(price) / Number((BigInt(10) ** decimals));
                 setFlrPrice(`$${formatted.toFixed(6)} (${CONFIG.ftsoSymbol})`);
             } catch (err) {
                 setFlrPrice('Unavailable');
