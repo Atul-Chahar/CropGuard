@@ -1,0 +1,4 @@
+Verifying On-Chain Modules with account: 0x836607d30B1e50378529cb6E1C5C32165FB07cD4
+Stored FTSO Registry: 0x48Da21ce34966A64E267CeFb78012C0282D0Ac87
+Fetching Live FLR Price from Coston2 FTSO...
+❌ Failed to fetch price (Maybe symbol not supported or registry issue): execution reverted: FTSO index not supported

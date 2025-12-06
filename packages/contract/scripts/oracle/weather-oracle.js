@@ -5,7 +5,7 @@ require('dotenv').config();
 // Configuration
 const WEATHER_API_URL = process.env.WEATHER_API_URL || 'https://api.openweathermap.org/data/2.5/weather';
 const WEATHER_API_KEY = process.env.WEATHER_API_KEY; // User needs to provide this
-const FDC_CONTRACT_ADDRESS = process.env.FDC_CONTRACT_ADDRESS || '0x7964f571e9f61163A6089718c82D8611D2AfBcab'; // Custom Weather Oracle (MockFDC logic)
+const FDC_CONTRACT_ADDRESS = process.env.FDC_CONTRACT_ADDRESS || '0xa896F4A547Fb1932Abad137907329ddf7B24b5dD'; // Custom Weather Oracle (MockFDC logic)
 
 async function fetchWeatherData(location) {
     if (!WEATHER_API_KEY) {

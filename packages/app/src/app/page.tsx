@@ -13,7 +13,7 @@ export default function Home() {
   const [cropType, setCropType] = useState('Wheat');
   const [insuredAmount, setInsuredAmount] = useState('1000');
 
-  const POLICY_MANAGER_ADDRESS = "0x4D800a55Ccbac49473476D976afE0c83973d043a"; // Deployed on Coston2 (Real FTSO Integrated)
+  const POLICY_MANAGER_ADDRESS = "0x24d656DEa3a449A894d3fDEB93dAc30eCCe2bADD"; // Deployed on Coston2 (Real FTSO "C2FLR" Integrated)
   const POLICY_MANAGER_ABI = require('./PolicyManagerABI.json');
 
   // Load account on mount

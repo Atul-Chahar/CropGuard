@@ -43,7 +43,8 @@ contract PayoutModule is Ownable {
 
         // Calculate payout in FLR using FTSO
         // policy.insuredAmount is in USD (18 decimals)
-        (uint256 flrPrice, , uint256 decimals) = ftsoRegistry.getCurrentPriceWithDecimals("FLR");
+        // Coston2 uses "C2FLR" symbol
+        (uint256 flrPrice, , uint256 decimals) = ftsoRegistry.getCurrentPriceWithDecimals("C2FLR");
         
         // Payout = (USD Amount * 10^decimals) / Price
         uint256 payoutAmount = (policy.insuredAmount * (10**decimals)) / flrPrice;
