@@ -1,106 +1,52 @@
-# CropGuard – Decentralized Parametric Insurance
+# CropGuard (Flare Coston2)
 
-**CropGuard** is a next-generation parametric insurance platform built on the **Flare Network**. It protects farmers against adverse weather events (droughts, floods) using automated smart contracts, real-time FTSO price feeds, and verifiable off-chain weather data.
+Parametric crop insurance dapp on Flare Coston2. Frontend is Next.js/Tailwind; smart contracts are Hardhat. Weather status is written on-chain through a WeatherOracleAdapter, and payouts use FTSO price feeds.
 
-![CropGuard UI](https://i.imgur.com/placeholder-image.png)
+## Current deployed addresses (Coston2)
+- PolicyManager: `0xfECdf117496b988b30c8a1eef36de3a3bC5Ed36b`
+- CollateralPool: `0x17A1cFADc601f25d536Fa1dAB64A08bFBD94e1DC`
+- PayoutModule: `0xfCB173a1c6a4B187811d7513A6a62720b42F1cA7`
+- WeatherOracleAdapter: `0x0Fd10bb23f3D17a149FFC0c0e7AA4eBE82eD9226`
+- FdcHub (attestation): `0x48aC463d7975828989331F4De43341627b9c5f1D`
+- FTSO Registry: `0x48Da21ce34966A64E267CeFb78012C0282D0Ac87`
 
-## 🚀 Key Features
+## Prerequisites
+- Node.js 20+ and npm installed.
+- MetaMask on Coston2 with some test FLR (for gas and the 10 FLR premium when buying a policy).
 
--   **Parametric Protection**: Payouts are triggered automatically based on data (e.g., "Rain < 100mm"), not claims adjusters.
--   **Real-Time Pricing**: Integrates **Flare Time Series Oracle (FTSO)** on Coston2 to fetch live `C2FLR` prices for accurate premium calculations.
--   **Verifiable Data**: Uses a custom **Weather Oracle** (simulating Flare Data Connector) to bring OpenWeatherMap data on-chain trustlessly.
--   **Instant Payouts**: policyholders are paid immediately when conditions are met.
--   **Modern Web3 UI**: A futuristic, glassmorphism-based dashboard built with **Next.js 15**, **Tailwind v4**, and **Framer Motion**.
-
-## 🛠 Tech Stack
-
--   **Blockchain**: Flare Network (Coston2 Testnet)
--   **Smart Contracts**: Solidity (Hardhat)
--   **Frontend**: Next.js 15, Tailwind CSS v4, Framer Motion, Ethers.js v6
--   **Oracles**:
-    -   **FTSO**: Real-time FLR/USD pricing.
-    -   **FDC (Simulation)**: Custom Weather Oracle for off-chain data verification.
--   **Data Provider**: OpenWeatherMap API
-
-## 📜 Deployed Contracts (Coston2)
-
-| Contract | Address | Notes |
-| :--- | :--- | :--- |
-| **PolicyManager** | `0x24d656DEa3a449A894d3fDEB93dAc30eCCe2bADD` | Core logic for policies |
-| **PayoutModule** | `0x6FA729B52166F31343753D5094251786A7604B50` | Handles FTSO pricing & payouts |
-| **CollateralPool** | `0xf56233d59470984baC403E53bd28905bF43C3A35` | Holds FLR liquidity |
-| **WeatherOracle** | `0xa896F4A547Fb1932Abad137907329ddf7B24b5dD` | MockFDC for weather data |
-| **FTSO Registry** | `0x48Da21ce34966A64E267CeFb78012C0282D0Ac87` | Official Coston2 Registry |
-
-## 📦 Installation & Setup
-
-### 1. Clone & Install
+## Install dependencies
 ```bash
-git clone https://github.com/your-org/cropguard.git
-cd cropguard
-
-# Install dependencies (Root, Contract, App)
-npm install
+# from repo root
 cd packages/contract && npm install
 cd ../app && npm install
 ```
 
-### 2. Configure Environment
-Create `.env` in `packages/contract`:
-```env
-PRIVATE_KEY=your_private_key
-WEATHER_API_KEY=your_openweathermap_key
-```
+## Environment files (already filled with current deploys)
+- `packages/contract/.env` holds deploy/oracle settings (private key, hubs, adapters, policy addresses, API key).
+- `packages/app/.env.local` holds frontend RPC and contract addresses.
+If you redeploy, update these files with the new addresses you get from the deploy script.
 
-### 3. Deploy Contracts (Optional)
-If you want to deploy your own instance:
-```bash
-cd packages/contract
-npx hardhat run scripts/deploy-modules.js --network coston2
-```
-
-### 4. Run the App
-Start the frontend with the new neon-dark theme:
+## Run the frontend (dashboard)
 ```bash
 cd packages/app
 npm run dev
 ```
-Open [http://localhost:3000](http://localhost:3000).
+Open http://localhost:3000 and click “Get Protected” to reach the dashboard. Connect MetaMask (Coston2).
 
-## 🎮 Usage Guide
+### Using the dashboard (simple steps)
+1) Connect your wallet (needs test FLR on Coston2).  
+2) Enter farm location, crop type, and insured amount in USD. Premium is fixed at 10 FLR in the UI.  
+3) Click “Purchase Coverage” and confirm in MetaMask.  
+4) After confirmation, the dashboard shows the latest policy, weather status (from on-chain adapter), and live FLR price.  
+5) When the oracle reports bad weather, the policy can be paid out automatically; the dashboard status updates when that happens.
 
-1.  **Connect Wallet**: Use MetaMask (switch to **Flare Coston2 Testnet**).
-2.  **Create Policy**: Go to the Dashboard, select "Wheat" or "Rice", and enter insured amount.
-    -   _Note: Premium is calculated live using FTSO prices._
-3.  **Monitor Status**: The dashboard shows live weather conditions fetched by the oracle.
-4.  **Trigger Payout**: Run the oracle script to simulate a weather event:
-    ```bash
-    cd packages/contract
-    node scripts/oracle/weather-oracle.js
-    ```
-    If conditions are met (e.g., Rain > Threshold), the contract pays out instantly.
-
-## 🏗 Architecture
-
-```mermaid
-graph TD
-    User[Farmer] -->|1. Pay Premium| PM[PolicyManager]
-    PM -->|2. Deposit| CP[CollateralPool]
-    
-    subgraph "Flare Network (Coston2)"
-        PM -->|3. Register| Pay[PayoutModule]
-        Pay -->|4. Get Price| FTSO[FTSO Registry]
-        Pay -->|5. Check Weather| WO[Weather Oracle]
-    end
-    
-    subgraph "Off-Chain"
-        Script[Oracle Script] -->|Fetch Weather| API[OpenWeatherMap]
-        Script -->|Submit Data| WO
-    end
-    
-    WO -->|6. Trigger Payout| Pay
-    Pay -->|7. Send Funds| User
+## Run the oracle script (writes weather on-chain and can trigger payouts)
+```bash
+cd packages/contract
+npx hardhat run scripts/oracle/weather-oracle.js --network coston2
 ```
+What it does: for each active policy, fetches OpenWeather data, requests an attestation on FdcHub, stores the result in WeatherOracleAdapter, and if adverse weather is detected, calls `checkAndPayout` on PayoutModule.
 
-## 📄 License
-MIT
+## Notes
+- WeatherOracleAdapter is a temporary store for weather status; when FDC proof verification is integrated, replace the direct write with proof-based verification.
+- Payout math uses insured amount as USD cents and FTSO price via `getCurrentPriceWithDecimals`.
