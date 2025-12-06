@@ -9,26 +9,26 @@ interface IFtsoRegistry {
     function getCurrentPriceWithDecimals(string memory _symbol) external view returns (uint256 value, uint256 timestamp, uint256 decimals);
 }
 
-interface IFDC {
-    function isRainy(string memory location, uint256 timestamp) external view returns (bool);
+interface IWeatherAdapter {
+    function isAdverse(string calldata location) external view returns (bool);
 }
 
 contract PayoutModule is Ownable {
     PolicyManager public policyManager;
     CollateralPool public collateralPool;
     IFtsoRegistry public ftsoRegistry;
-    IFDC public fdc;
+    IWeatherAdapter public weatherAdapter;
 
     constructor(
         address _policyManager, 
         address _collateralPool, 
         address _ftsoRegistry, 
-        address _fdc
+        address _weatherAdapter
     ) Ownable(msg.sender) {
         policyManager = PolicyManager(_policyManager);
         collateralPool = CollateralPool(payable(_collateralPool));
         ftsoRegistry = IFtsoRegistry(_ftsoRegistry);
-        fdc = IFDC(_fdc);
+        weatherAdapter = IWeatherAdapter(_weatherAdapter);
     }
 
     function checkAndPayout(uint256 _policyId) external {
@@ -37,17 +37,18 @@ contract PayoutModule is Ownable {
         require(policy.active, "Policy not active");
         require(!policy.paidOut, "Already paid out");
 
-        // FDC Verification (Simplified)
-        bool adverseWeather = fdc.isRainy(policy.location, block.timestamp);
+        // Weather status from adapter (currently off-chain oracle writes; replace with proof-based verification when available)
+        bool adverseWeather = weatherAdapter.isAdverse(policy.location);
         require(adverseWeather, "Conditions not met");
 
         // Calculate payout in FLR using FTSO
-        // policy.insuredAmount is in USD (18 decimals)
+        // policy.insuredAmount is stored as USD cents (two decimals)
         // Coston2 uses "C2FLR" symbol
         (uint256 flrPrice, , uint256 decimals) = ftsoRegistry.getCurrentPriceWithDecimals("C2FLR");
-        
-        // Payout = (USD Amount * 10^decimals) / Price
-        uint256 payoutAmount = (policy.insuredAmount * (10**decimals)) / flrPrice;
+        require(flrPrice > 0, "Invalid price from FTSO");
+
+        // Payout = (USD cents * 10^decimals) / (price * 100) to bring cents back to whole USD
+        uint256 payoutAmount = (policy.insuredAmount * (10**decimals)) / (flrPrice * 100);
 
         // Trigger Payout
         policyManager.payoutPolicy(_policyId);

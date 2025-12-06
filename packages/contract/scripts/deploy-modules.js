@@ -5,21 +5,34 @@ async function main() {
     console.log("Deploying contracts with the account:", deployer.address);
 
     // 1. Setup Addresses
-    let ftsoAddress, fdcAddress;
+    let ftsoAddress, fdcAddress, weatherAdapterAddress;
+    const envFtso = process.env.FTSO_REGISTRY_ADDRESS;
+    const envFdc = process.env.FDC_CONTRACT_ADDRESS;
+    const envWeatherAdapter = process.env.WEATHER_ADAPTER_ADDRESS;
+    const oracleSubmitter = process.env.WEATHER_SUBMITTER_ADDRESS || deployer.address;
 
     if (hre.network.name === "coston2") {
         console.log("Using Real Flare FTSO Registry on Coston2");
-        ftsoAddress = "0x48Da21ce34966A64E267CeFb78012C0282D0Ac87"; // FtsoRegistry
+        ftsoAddress = envFtso || "0x48Da21ce34966A64E267CeFb78012C0282D0Ac87"; // FtsoRegistry default
 
-        // For FDC, we still need our custom weather logic (isRainy).
-        // Real FdcHub is for verification, not storage of arbitrary weather state.
-        // So we deploy our own 'Oracle' for weather but call it FDC for architecture.
-        console.log("Deploying Custom Weather Oracle (MockFDC)...");
-        const MockFDC = await hre.ethers.getContractFactory("MockFDC");
-        const mockFdc = await MockFDC.deploy();
-        await mockFdc.waitForDeployment();
-        fdcAddress = await mockFdc.getAddress();
-        console.log("Custom Weather Oracle deployed to:", fdcAddress);
+        if (envFdc) {
+            console.log("Using provided FDC contract:", envFdc);
+            fdcAddress = envFdc;
+        } else {
+            console.log("⚠️ No FDC contract address provided; requestAttestation will be unavailable.");
+        }
+
+        if (envWeatherAdapter) {
+            console.log("Using existing WeatherAdapter:", envWeatherAdapter);
+            weatherAdapterAddress = envWeatherAdapter;
+        } else {
+            console.log("Deploying WeatherOracleAdapter...");
+            const WeatherOracleAdapter = await hre.ethers.getContractFactory("WeatherOracleAdapter");
+            const adapter = await WeatherOracleAdapter.deploy(oracleSubmitter);
+            await adapter.waitForDeployment();
+            weatherAdapterAddress = await adapter.getAddress();
+            console.log("WeatherOracleAdapter deployed to:", weatherAdapterAddress);
+        }
 
     } else {
         console.log("Deploying Mocks...");
@@ -34,6 +47,12 @@ async function main() {
         await mockFdc.waitForDeployment();
         fdcAddress = await mockFdc.getAddress();
         console.log("MockFDC deployed to:", fdcAddress);
+
+        const WeatherOracleAdapter = await hre.ethers.getContractFactory("WeatherOracleAdapter");
+        const adapter = await WeatherOracleAdapter.deploy(oracleSubmitter);
+        await adapter.waitForDeployment();
+        weatherAdapterAddress = await adapter.getAddress();
+        console.log("WeatherOracleAdapter deployed to:", weatherAdapterAddress);
     }
 
     // 2. Deploy Modules
@@ -52,7 +71,7 @@ async function main() {
         await policyManager.getAddress(),
         await collateralPool.getAddress(),
         ftsoAddress,
-        fdcAddress
+        weatherAdapterAddress
     );
     await payoutModule.waitForDeployment();
     console.log("PayoutModule deployed to:", await payoutModule.getAddress());

@@ -1,23 +1,90 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ethers } from 'ethers';
 import { motion } from 'framer-motion';
 import { Shield, CloudRain, Wallet, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 
+const POLICY_MANAGER_ABI = require('../PolicyManagerABI.json');
+const WEATHER_ADAPTER_ABI = [
+    "function isAdverse(string location) external view returns (bool)"
+];
+const FTSO_REGISTRY_ABI = [
+    "function getCurrentPriceWithDecimals(string memory _symbol) external view returns (uint256 value, uint256 timestamp, uint256 decimals)"
+];
+
+const CONFIG = {
+    policyManager: process.env.NEXT_PUBLIC_POLICY_MANAGER_ADDRESS || "0x24d656DEa3a449A894d3fDEB93dAc30eCCe2bADD",
+    weatherAdapter: process.env.NEXT_PUBLIC_WEATHER_ADAPTER_ADDRESS || "0x0000000000000000000000000000000000000000",
+    ftsoRegistry: process.env.NEXT_PUBLIC_FTSO_REGISTRY_ADDRESS || "0x48Da21ce34966A64E267CeFb78012C0282D0Ac87",
+    ftsoSymbol: process.env.NEXT_PUBLIC_FTSO_SYMBOL || "C2FLR",
+    rpcUrl: process.env.NEXT_PUBLIC_RPC_URL || "https://coston2-api.flare.network/ext/C/rpc",
+};
+
 export default function Dashboard() {
     const [account, setAccount] = useState<string | null>(null);
     const [status, setStatus] = useState<string>('');
     const [loading, setLoading] = useState(false);
+    const [chainLoading, setChainLoading] = useState(false);
 
     // Form State
     const [location, setLocation] = useState('Bangalore');
     const [cropType, setCropType] = useState('Wheat');
     const [insuredAmount, setInsuredAmount] = useState('1000');
 
-    const POLICY_MANAGER_ADDRESS = "0x24d656DEa3a449A894d3fDEB93dAc30eCCe2bADD";
-    const POLICY_MANAGER_ABI = require('../PolicyManagerABI.json');
+    // Chain data
+    const [latestPolicyId, setLatestPolicyId] = useState<number | null>(null);
+    const [latestPolicyLocation, setLatestPolicyLocation] = useState<string>('');
+    const [policyStatus, setPolicyStatus] = useState<string>('Not created yet');
+    const [weatherStatus, setWeatherStatus] = useState<string>('Unknown');
+    const [oracleOnline, setOracleOnline] = useState<boolean>(false);
+    const [flrPrice, setFlrPrice] = useState<string>('');
+    const [insuredAmountDisplay, setInsuredAmountDisplay] = useState<string>('');
+
+    const rpcProvider = useMemo(() => new ethers.JsonRpcProvider(CONFIG.rpcUrl), []);
+
+    const loadChainData = useCallback(async () => {
+        setChainLoading(true);
+        try {
+            const policyContract = new ethers.Contract(CONFIG.policyManager, POLICY_MANAGER_ABI, rpcProvider);
+            const ftsoContract = new ethers.Contract(CONFIG.ftsoRegistry, FTSO_REGISTRY_ABI, rpcProvider);
+            const weatherAdapter = new ethers.Contract(CONFIG.weatherAdapter, WEATHER_ADAPTER_ABI, rpcProvider);
+
+            const count: bigint = await policyContract.policyCount();
+            if (count > 0n) {
+                const policy = await policyContract.getPolicy(count);
+                setLatestPolicyId(Number(count));
+                setLatestPolicyLocation(policy.location);
+                setPolicyStatus(policy.paidOut ? 'Paid out' : policy.active ? 'Active' : 'Inactive');
+                setInsuredAmountDisplay((Number(policy.insuredAmount) / 100).toFixed(2)); // cents -> USD
+
+                try {
+                    const isAdverse: boolean = await weatherAdapter.isAdverse(policy.location);
+                    setWeatherStatus(isAdverse ? 'Adverse (rain/heat)' : 'Normal');
+                    setOracleOnline(true);
+                } catch (err) {
+                    setWeatherStatus('Unavailable (WeatherAdapter call failed)');
+                    setOracleOnline(false);
+                }
+            } else {
+                setPolicyStatus('No policies yet');
+            }
+
+            try {
+                const [price, , decimals]: [bigint, bigint, bigint] = await ftsoContract.getCurrentPriceWithDecimals(CONFIG.ftsoSymbol);
+                const formatted = Number(price) / Number(10n ** decimals);
+                setFlrPrice(`$${formatted.toFixed(6)} (${CONFIG.ftsoSymbol})`);
+            } catch (err) {
+                setFlrPrice('Unavailable');
+            }
+        } catch (err: any) {
+            console.error('Failed to load chain data', err);
+            setPolicyStatus('Error loading data');
+        } finally {
+            setChainLoading(false);
+        }
+    }, [rpcProvider]);
 
     useEffect(() => {
         if ((window as any).ethereum) {
@@ -26,7 +93,8 @@ export default function Dashboard() {
                     if (accounts.length > 0) setAccount(accounts[0]);
                 });
         }
-    }, []);
+        loadChainData();
+    }, [loadChainData]);
 
     const connect = async () => {
         if ((window as any).ethereum) {
@@ -51,14 +119,14 @@ export default function Dashboard() {
         try {
             const provider = new ethers.BrowserProvider((window as any).ethereum);
             const signer = await provider.getSigner();
-            const contract = new ethers.Contract(POLICY_MANAGER_ADDRESS, POLICY_MANAGER_ABI, signer);
+            const contract = new ethers.Contract(CONFIG.policyManager, POLICY_MANAGER_ABI, signer);
 
             const premium = ethers.parseEther("10");
 
             const tx = await contract.createPolicy(
                 location,
                 cropType,
-                ethers.parseUnits(insuredAmount, 18),
+                ethers.parseUnits(insuredAmount, 2), // store as USD cents
                 30 * 24 * 60 * 60,
                 { value: premium }
             );
@@ -66,6 +134,7 @@ export default function Dashboard() {
             setStatus('Transaction Sent: ' + tx.hash);
             await tx.wait();
             setStatus('Policy Created Successfully! 🎉');
+            await loadChainData();
 
         } catch (e: any) {
             console.error(e);
@@ -192,20 +261,42 @@ export default function Dashboard() {
                             </h3>
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center p-3 rounded-lg bg-white/5">
+                                    <span className="text-gray-400">Latest Policy</span>
+                                    <span className="font-medium">
+                                        {chainLoading ? 'Loading...' : latestPolicyId ? `#${latestPolicyId}` : 'None'}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-center p-3 rounded-lg bg-white/5">
                                     <span className="text-gray-400">Location</span>
-                                    <span className="font-medium">{location}</span>
+                                    <span className="font-medium">{latestPolicyLocation || location}</span>
                                 </div>
                                 <div className="flex justify-between items-center p-3 rounded-lg bg-white/5">
                                     <span className="text-gray-400">Condition</span>
-                                    <span className="text-green-400 font-medium">Normal</span>
+                                    <span className={weatherStatus.includes('Adverse') ? 'text-red-400 font-medium' : 'text-green-400 font-medium'}>
+                                        {chainLoading ? 'Checking...' : weatherStatus}
+                                    </span>
                                 </div>
                                 <div className="flex justify-between items-center p-3 rounded-lg bg-white/5">
                                     <span className="text-gray-400">Oracle Status</span>
-                                    <span className="flex items-center text-xs text-[#00ff9d] bg-[#00ff9d]/10 px-2 py-1 rounded-full">
-                                        <span className="w-2 h-2 bg-[#00ff9d] rounded-full mr-2 animate-pulse"></span>
-                                        Online
+                                    <span className={`flex items-center text-xs px-2 py-1 rounded-full ${oracleOnline ? 'text-[#00ff9d] bg-[#00ff9d]/10' : 'text-red-300 bg-red-500/10'}`}>
+                                        <span className={`w-2 h-2 rounded-full mr-2 ${oracleOnline ? 'bg-[#00ff9d] animate-pulse' : 'bg-red-400'}`}></span>
+                                        {oracleOnline ? 'Online' : 'Offline / Unreachable'}
                                     </span>
                                 </div>
+                                <div className="flex justify-between items-center p-3 rounded-lg bg-white/5">
+                                    <span className="text-gray-400">FLR Price</span>
+                                    <span className="font-medium">{flrPrice || 'Loading...'}</span>
+                                </div>
+                                <div className="flex justify-between items-center p-3 rounded-lg bg-white/5">
+                                    <span className="text-gray-400">Status</span>
+                                    <span className="font-medium">{policyStatus}</span>
+                                </div>
+                                {insuredAmountDisplay && (
+                                    <div className="flex justify-between items-center p-3 rounded-lg bg-white/5">
+                                        <span className="text-gray-400">Insured Value</span>
+                                        <span className="font-medium">${insuredAmountDisplay}</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
