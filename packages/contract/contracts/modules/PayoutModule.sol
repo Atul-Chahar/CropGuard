@@ -31,6 +31,8 @@ contract PayoutModule is Ownable {
         weatherAdapter = IWeatherAdapter(_weatherAdapter);
     }
 
+    event PayoutTriggered(uint256 indexed policyId, address indexed farmer, uint256 payoutAmount);
+
     function checkAndPayout(uint256 _policyId) external {
         PolicyManager.Policy memory policy = policyManager.getPolicy(_policyId);
         
@@ -48,9 +50,12 @@ contract PayoutModule is Ownable {
         require(flrPrice > 0, "Invalid price from FTSO");
 
         uint256 payoutAmount = (policy.insuredAmount * (10**decimals) * 1e18) / (flrPrice * 100);
+        uint256 available = collateralPool.availableLiquidity();
+        require(available >= payoutAmount, "Insufficient pool liquidity for payout");
 
         // Trigger Payout
         policyManager.payoutPolicy(_policyId);
         collateralPool.processPayout(policy.farmer, payoutAmount);
+        emit PayoutTriggered(_policyId, policy.farmer, payoutAmount);
     }
 }
