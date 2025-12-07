@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ethers } from 'ethers';
 import { motion } from 'framer-motion';
-import { Shield, CloudRain, Wallet, ChevronRight, Info } from 'lucide-react';
+import { Shield, CloudRain, Wallet, ChevronRight, Info, Users } from 'lucide-react';
 import Link from 'next/link';
 
 const POLICY_MANAGER_ABI = require('../PolicyManagerABI.json');
@@ -65,6 +65,7 @@ export default function Dashboard() {
     const [insuredAmountDisplay, setInsuredAmountDisplay] = useState<string>('');
     const [payoutEstimate, setPayoutEstimate] = useState<string>('');
     const [capacityWarning, setCapacityWarning] = useState<string>('');
+    const [showAllPolicies, setShowAllPolicies] = useState<boolean>(false);
 
     const rpcProvider = useMemo(() => new ethers.JsonRpcProvider(CONFIG.rpcUrl), []);
 
@@ -89,20 +90,23 @@ export default function Dashboard() {
                 setFlrPrice('Unavailable');
             }
 
-            // policies list
+            // policies list (filtered to my policies unless showAllPolicies)
             const count: bigint = await policyContract.policyCount();
-            const all: { id: number; data: Policy }[] = [];
+            const list: { id: number; data: Policy }[] = [];
             for (let i = 1; i <= Number(count); i++) {
                 const p: Policy = await policyContract.getPolicy(i);
-                all.push({ id: i, data: p });
+                if (!showAllPolicies && account) {
+                    if (p.farmer.toLowerCase() !== account.toLowerCase()) continue;
+                }
+                list.push({ id: i, data: p });
             }
-            setPolicies(all);
-            const latest = all.length ? all[all.length - 1] : null;
+            setPolicies(list);
+            const latest = list.length ? list[list.length - 1] : null;
             const activeSelection = selectedPolicyId || (latest ? latest.id : null);
             setSelectedPolicyId(activeSelection);
 
             if (activeSelection) {
-                const policy = all.find(p => p.id === activeSelection)?.data;
+                const policy = list.find(p => p.id === activeSelection)?.data;
                 if (policy) {
                     setPolicyStatus(policy.paidOut ? 'Paid out' : policy.active ? 'Active' : 'Inactive');
                     setPolicyLocation(policy.location);
@@ -120,12 +124,14 @@ export default function Dashboard() {
                     let payoutText = '';
                     let warnText = '';
                     if (price > BigInt(0) && priceDecimals > BigInt(0)) {
-                        const payout = (policy.insuredAmount * (BigInt(10) ** priceDecimals)) / (price * BigInt(100));
-                        payoutText = `${ethers.formatEther(payout)} FLR`; // approximate
+                        // Match on-chain formula: payoutWei = (USD_cents * 10^dec * 1e18) / (price * 100)
+                        const payoutWei = (policy.insuredAmount * (BigInt(10) ** priceDecimals) * BigInt(1e18)) / (price * BigInt(100));
+                        const payoutNum = Number(payoutWei) / 1e18;
+                        payoutText = `${payoutNum.toFixed(4)} FLR`;
                         try {
-                            const avail: bigint = await poolContract.availableLiquidity();
-                            if (avail < payout) {
-                                warnText = `Pool liquidity too low for this payout (needs ~${ethers.formatEther(payout)} FLR, has ${ethers.formatEther(avail)} FLR)`;
+                            const availWei: bigint = await poolContract.availableLiquidity();
+                            if (availWei < payoutWei) {
+                                warnText = `Pool liquidity too low for this payout (needs ~${payoutNum.toFixed(4)} FLR, has ${ethers.formatEther(availWei)} FLR)`;
                             }
                         } catch (err) {
                             // ignore
@@ -136,6 +142,7 @@ export default function Dashboard() {
                 }
             } else {
                 setPolicyStatus('No policies yet');
+                setPolicyLocation('');
                 setInsuredAmountDisplay('');
                 setPayoutEstimate('');
                 setCapacityWarning('');
@@ -162,7 +169,7 @@ export default function Dashboard() {
         } finally {
             setChainLoading(false);
         }
-    }, [rpcProvider, account, selectedPolicyId]);
+    }, [rpcProvider, account, selectedPolicyId, showAllPolicies]);
 
     useEffect(() => {
         if ((window as any).ethereum) {
@@ -343,6 +350,21 @@ export default function Dashboard() {
                         <div className="text-sm text-gray-500">Policy + Weather + Price</div>
                     </div>
 
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => setShowAllPolicies(false)}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${!showAllPolicies ? 'border-[#00ff9d] text-[#00ff9d]' : 'border-white/10 text-gray-300'}`}
+                        >
+                            <Shield className="w-4 h-4" /> My Policies
+                        </button>
+                        <button
+                            onClick={() => setShowAllPolicies(true)}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${showAllPolicies ? 'border-[#00ff9d] text-[#00ff9d]' : 'border-white/10 text-gray-300'}`}
+                        >
+                            <Users className="w-4 h-4" /> All Policies
+                        </button>
+                    </div>
+
                     <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
                         <StatCard label="Policy Status" value={policyStatus} accent="text-[#00ff9d]"/>
                         <StatCard label="FLR Price" value={flrPrice || 'Loading...'} />
@@ -438,7 +460,7 @@ export default function Dashboard() {
                             </h3>
 
                             <div className="space-y-2 mb-4">
-                                <label className="text-sm text-gray-400">Select Policy</label>
+                                <label className="text-sm text-gray-400">Select Policy ({showAllPolicies ? 'All' : 'Mine'})</label>
                                 <select
                                     value={selectedPolicyId || ''}
                                     onChange={(e) => setSelectedPolicyId(Number(e.target.value) || null)}
@@ -590,7 +612,7 @@ function Alert({ text, tone }: { text: string; tone?: 'warning' | 'error' | 'inf
     const color = tone === 'warning' ? 'text-yellow-300' : tone === 'error' ? 'text-red-300' : 'text-[#00ff9d]';
     const border = tone === 'warning' ? 'border-yellow-500/50' : tone === 'error' ? 'border-red-500/50' : 'border-[#00ff9d]/40';
     return (
-        <div className={`mt-3 bg-white/5 border ${border} rounded-xl p-3 text-sm flex items-center gap-2`}>            
+        <div className={`mt-3 bg-white/5 border ${border} rounded-xl p-3 text-sm flex items-center gap-2`}>
             <Info className={`w-4 h-4 ${color}`} />
             <span className={color}>{text}</span>
         </div>

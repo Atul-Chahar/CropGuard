@@ -41,14 +41,13 @@ contract PayoutModule is Ownable {
         bool adverseWeather = weatherAdapter.isAdverse(policy.location);
         require(adverseWeather, "Conditions not met");
 
-        // Calculate payout in FLR using FTSO
+        // Calculate payout in WEI using FTSO
         // policy.insuredAmount is stored as USD cents (two decimals)
-        // Coston2 uses "C2FLR" symbol
+        // PayoutWei = (USD_cents * 10^priceDecimals * 1e18) / (price * 100)
         (uint256 flrPrice, , uint256 decimals) = ftsoRegistry.getCurrentPriceWithDecimals("C2FLR");
         require(flrPrice > 0, "Invalid price from FTSO");
 
-        // Payout = (USD cents * 10^decimals) / (price * 100) to bring cents back to whole USD
-        uint256 payoutAmount = (policy.insuredAmount * (10**decimals)) / (flrPrice * 100);
+        uint256 payoutAmount = (policy.insuredAmount * (10**decimals) * 1e18) / (flrPrice * 100);
 
         // Trigger Payout
         policyManager.payoutPolicy(_policyId);
