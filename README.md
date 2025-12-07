@@ -9,6 +9,9 @@ CropGuard solves the inefficiency of traditional agriculture insurance by automa
 
 ---
 
+<img width="1376" height="768" alt="image" src="https://github.com/user-attachments/assets/851f4d14-6682-41bc-b8c7-d5c477d01f8b" />
+
+
 ## 🏗️ Technology Stack (Where we use Flare)
 
 We leverage Flare's enshrined protocols to build a system that is both **trustless** and **economically sound**.
