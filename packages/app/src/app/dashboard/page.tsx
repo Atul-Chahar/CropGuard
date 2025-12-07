@@ -59,6 +59,7 @@ export default function Dashboard() {
     const [selectedPolicyId, setSelectedPolicyId] = useState<number | null>(null);
     const [policyStatus, setPolicyStatus] = useState<string>('No policies yet');
     const [policyLocation, setPolicyLocation] = useState<string>('');
+    const [policyFarmer, setPolicyFarmer] = useState<string>('');
     const [weatherStatus, setWeatherStatus] = useState<string>('Unknown');
     const [oracleOnline, setOracleOnline] = useState<boolean>(false);
     const [flrPrice, setFlrPrice] = useState<string>('');
@@ -110,6 +111,7 @@ export default function Dashboard() {
                 if (policy) {
                     setPolicyStatus(policy.paidOut ? 'Paid out' : policy.active ? 'Active' : 'Inactive');
                     setPolicyLocation(policy.location);
+                    setPolicyFarmer(policy.farmer);
                     setInsuredAmountDisplay((Number(policy.insuredAmount) / 100).toFixed(2)); // cents -> USD
                     try {
                         const isAdverse: boolean = await weatherAdapter.isAdverse(policy.location);
@@ -143,6 +145,7 @@ export default function Dashboard() {
             } else {
                 setPolicyStatus('No policies yet');
                 setPolicyLocation('');
+                setPolicyFarmer('');
                 setInsuredAmountDisplay('');
                 setPayoutEstimate('');
                 setCapacityWarning('');
@@ -478,6 +481,7 @@ export default function Dashboard() {
                             <div className="space-y-3">
                                 <StatusRow label="Latest Policy" value={chainLoading ? 'Loading...' : selectedPolicyId ? `#${selectedPolicyId}` : policies.length ? `#${policies[policies.length-1].id}` : 'None'} />
                                 <StatusRow label="Location" value={policyLocation || location} />
+                                {policyFarmer && <StatusRow label="Farmer (payout)" value={`${policyFarmer.substring(0, 6)}...${policyFarmer.substring(38)}`} />}
                                 <StatusRow label="Condition" value={chainLoading ? 'Checking...' : weatherStatus} valueClass={weatherStatus.includes('Adverse') ? 'text-red-400' : 'text-green-400'} />
                                 <StatusRow label="Oracle" value={oracleOnline ? 'Online' : 'Offline'} valueClass={oracleOnline ? 'text-[#00ff9d]' : 'text-red-400'} />
                                 <StatusRow label="FLR Price" value={flrPrice || 'Loading...'} />
